@@ -52,11 +52,19 @@ public class CategoriaServiceImpl implements CategoriaService {
                         "Categoria no encontrada con id: "+ aLong
                 )
         );
-        categoria.setNombre(t.getNombre());
+
+        String nombre = t.getNombre().trim();
+        if(categoriaRepository.existsByNombreIgnoreCaseAndIdNot(nombre, aLong)){
+            throw new ReglaNegocioException(
+                    "Ya existe una categoria con el nomre "+ nombre
+            );
+        }
+
+        categoria.setNombre(nombre);
         categoria.setDescripcion(t.getDescripcion());
         categoria.setEstado(t.getEstado());
 
-        Categoria catActualizada = categoriaRepository.save(categoria);
+        Categoria catActualizada = categoriaRepository.saveAndFlush(categoria);
 
         return convertirResponse(catActualizada);
     }

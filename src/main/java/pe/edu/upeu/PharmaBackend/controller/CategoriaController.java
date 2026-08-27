@@ -47,8 +47,6 @@ public class CategoriaController {
     public ResponseEntity<CategoriaResponseDTO> update(
             @PathVariable Long id,
             @Valid @RequestBody CategoriaRequestDTO requestDTO) {
-        CategoriaResponseDTO response = categoriaService.create(requestDTO);
-
         return ResponseEntity.ok(
                 categoriaService.update(id, requestDTO)
         );
