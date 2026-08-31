@@ -8,7 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import pe.edu.upeu.PharmaBackend.dto.ErrorResponseDTO;
+import pe.edu.upeu.PharmaBackend.exception.dto.ErrorResponseDTO;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
