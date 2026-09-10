@@ -36,3 +36,9 @@ logging:
     org.springframework.web: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger{36} - %msg%n"
+
+# En produccion el origen del frontend llega por variable de entorno,
+# tambien de forma explicita y sin comodin.
+app:
+  cors:
+    allowed-origins: ${FRONTEND_ORIGINS:https://pharmasoft.upeu.edu.pe}

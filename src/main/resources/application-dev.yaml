@@ -32,3 +32,9 @@ logging:
     org.springframework.web: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
+
+# Origenes del frontend autorizados a consumir /api/** en desarrollo.
+# Se declaran uno por uno: nunca el comodin "*".
+app:
+  cors:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173,http://localhost:4200
