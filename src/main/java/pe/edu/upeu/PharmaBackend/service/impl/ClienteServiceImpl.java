@@ -107,12 +107,20 @@ public class ClienteServiceImpl
     @Transactional(readOnly = true)
     public List<ClienteResponseDTO> readAll() {
 
-        log.info("Listando clientes");
+        long inicio = System.currentTimeMillis();
+        log.info("Inicio listar clientes");
 
-        return clienteRepository.findAll()
-                .stream()
-                .map(this::convertirResponse)
-                .toList();
+        List<ClienteResponseDTO> resultado =
+                clienteRepository.findAll()
+                        .stream()
+                        .map(this::convertirResponse)
+                        .toList();
+
+        log.info("Fin listar clientes | filas={} | duracionMs={}",
+                resultado.size(),
+                System.currentTimeMillis() - inicio);
+
+        return resultado;
     }
 
     @Override

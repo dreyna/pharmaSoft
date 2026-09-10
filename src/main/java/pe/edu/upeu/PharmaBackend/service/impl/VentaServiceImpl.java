@@ -1,5 +1,7 @@
 package pe.edu.upeu.PharmaBackend.service.impl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,9 @@ import java.util.List;
 import java.util.Set;
 @Service
 public class VentaServiceImpl implements VentaService {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(VentaServiceImpl.class);
 
     /*
      * Lista blanca de campos por los que se permite ordenar la
@@ -56,6 +61,15 @@ public class VentaServiceImpl implements VentaService {
     @Override
     @Transactional
     public VentaResponseDTO registrar(VentaRequestDTO request) {
+
+        long inicio = System.currentTimeMillis();
+
+        log.info("Inicio registrar venta | clienteId={} | items={}",
+                request.getClienteId(),
+                request.getDetalles() == null
+                        ? 0
+                        : request.getDetalles().size());
+
         Cliente cliente = clienteRepository.findById(request.getClienteId())
                         .orElseThrow(() ->new RecursoNoEncontradoException("Cliente no encontrado con id: "+ request.getClienteId()));
 
@@ -104,6 +118,13 @@ public class VentaServiceImpl implements VentaService {
 
         Venta guardada =ventaRepository.save(venta);
 
+        log.info("Fin registrar venta | ventaId={} | total={} | "
+                        + "filas={} | duracionMs={}",
+                guardada.getId(),
+                guardada.getTotal(),
+                guardada.getDetalles().size(),
+                System.currentTimeMillis() - inicio);
+
         return convertirResponse(guardada);
     }
 
@@ -111,15 +132,36 @@ public class VentaServiceImpl implements VentaService {
     @Transactional(readOnly = true)
     public VentaResponseDTO buscar(Long id) {
 
+        long inicio = System.currentTimeMillis();
+        log.info("Inicio buscar venta por id | id={}", id);
+
         Venta venta = ventaRepository.findById(id).orElseThrow(() ->
                                 new RecursoNoEncontradoException("Venta no encontrada con id: "+ id));
+
+        log.info("Fin buscar venta por id | id={} | filas={} | duracionMs={}",
+                id, 1, System.currentTimeMillis() - inicio);
+
         return convertirResponse(venta);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<VentaResponseDTO> listar() {
-        return ventaRepository.findAll().stream().map(this::convertirResponse).toList();
+
+        long inicio = System.currentTimeMillis();
+        log.info("Inicio listar ventas");
+
+        List<VentaResponseDTO> resultado =
+                ventaRepository.findAll()
+                        .stream()
+                        .map(this::convertirResponse)
+                        .toList();
+
+        log.info("Fin listar ventas | filas={} | duracionMs={}",
+                resultado.size(),
+                System.currentTimeMillis() - inicio);
+
+        return resultado;
     }
 
     @Override
@@ -131,6 +173,12 @@ public class VentaServiceImpl implements VentaService {
             LocalDate hasta,
             String ordenarPor,
             String direccion) {
+
+        long inicio = System.currentTimeMillis();
+
+        log.info("Inicio buscar ventas | clienteId={} | estado={} | "
+                        + "desde={} | hasta={} | ordenarPor={} | direccion={}",
+                clienteId, estado, desde, hasta, ordenarPor, direccion);
 
         if (desde != null
                 && hasta != null
@@ -159,6 +207,13 @@ public class VentaServiceImpl implements VentaService {
                         .stream()
                         .map(this::convertirResponse)
                         .toList();
+
+        log.info("Fin buscar ventas | clienteId={} | estado={} | "
+                        + "desde={} | hasta={} | orden={} {} | "
+                        + "filas={} | duracionMs={}",
+                clienteId, estado, desde, hasta, ordenarPor, direccion,
+                resultado.size(),
+                System.currentTimeMillis() - inicio);
 
         return resultado;
     }

@@ -3,6 +3,7 @@ package pe.edu.upeu.PharmaBackend.service.impl;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.upeu.PharmaBackend.dto.ProductoRequestDTO;
@@ -18,6 +19,9 @@ import pe.edu.upeu.PharmaBackend.service.service.ProductoService;
 
 @Service
 public class ProductoServiceImpl implements ProductoService {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(ProductoServiceImpl.class);
     private static final Logger LOG = LoggerFactory.getLogger(ProductoServiceImpl.class);
 
     private final ProductoRepository productoRepository;
@@ -85,6 +89,9 @@ public class ProductoServiceImpl implements ProductoService {
     @Override
     @Transactional(readOnly = true)
     public ProductoResponseDTO read(Long aLong) {
+
+        log.info("Buscando producto | id={}", aLong);
+
         Producto producto = productoRepository.findById(aLong)
                 .orElseThrow(()->
                         new RecursoNoEncontradoException(
@@ -108,10 +115,21 @@ public class ProductoServiceImpl implements ProductoService {
     @Override
     @Transactional(readOnly = true)
     public Iterable<ProductoResponseDTO> readAll() {
-        return productoRepository.findAll()
-                .stream()
-                .map(this::convertirResponse)
-                .toList();
+
+        long inicio = System.currentTimeMillis();
+        log.info("Inicio listar productos");
+
+        List<ProductoResponseDTO> resultado =
+                productoRepository.findAll()
+                        .stream()
+                        .map(this::convertirResponse)
+                        .toList();
+
+        log.info("Fin listar productos | filas={} | duracionMs={}",
+                resultado.size(),
+                System.currentTimeMillis() - inicio);
+
+        return resultado;
     }
 
     private Categoria buscarCategoria(Long categoriaId){

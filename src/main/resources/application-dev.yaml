@@ -19,3 +19,16 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     enabled: true
+
+# Trazabilidad en desarrollo: se quiere ver el detalle de las
+# consultas y de los parametros que llegan a cada servicio.
+logging:
+  level:
+    root: INFO
+    pe.edu.upeu.PharmaBackend: DEBUG
+    pe.edu.upeu.PharmaBackend.service.impl: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.springframework.web: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"

@@ -23,3 +23,16 @@ springdoc:
 
   api-docs:
     enabled: false
+
+# En produccion solo se conserva la traza funcional de los servicios
+# (parametros, filas y duracion); el SQL y el detalle web se apagan.
+logging:
+  level:
+    root: WARN
+    pe.edu.upeu.PharmaBackend: INFO
+    pe.edu.upeu.PharmaBackend.service.impl: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    org.springframework.web: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger{36} - %msg%n"
