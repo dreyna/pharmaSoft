@@ -4,6 +4,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import pe.edu.upeu.PharmaBackend.dto.reporte.ProductoMasVendidoDTO;
+import pe.edu.upeu.PharmaBackend.dto.reporte.VentaPorCategoriaDTO;
 import pe.edu.upeu.PharmaBackend.entity.Venta;
 import pe.edu.upeu.PharmaBackend.enums.EstadoVenta;
 
@@ -43,4 +45,58 @@ public interface VentaRepository
             @Param("desde") LocalDateTime desde,
             @Param("hasta") LocalDateTime hasta,
             Sort sort);
+
+    /*
+     * Reporte: total facturado y unidades vendidas por categoría.
+     *
+     * Proyecta con select new sobre el record, agrupa por categoría y
+     * considera únicamente las ventas REGISTRADA, de modo que las
+     * ventas anuladas nunca suman al reporte.
+     */
+    @Query("""
+            select new pe.edu.upeu.PharmaBackend.dto.reporte.VentaPorCategoriaDTO(
+                       cat.id,
+                       cat.nombre,
+                       sum(d.cantidad),
+                       sum(d.subtotal))
+            from DetalleVenta d
+            join d.venta v
+            join d.producto p
+            join p.categoria cat
+            where v.estado = pe.edu.upeu.PharmaBackend.enums.EstadoVenta.REGISTRADA
+              and (:desde is null or v.fecha >= :desde)
+              and (:hasta is null or v.fecha <= :hasta)
+            group by cat.id, cat.nombre
+            order by sum(d.subtotal) desc
+            """)
+    List<VentaPorCategoriaDTO> reporteVentasPorCategoria(
+            @Param("desde") LocalDateTime desde,
+            @Param("hasta") LocalDateTime hasta);
+
+    /*
+     * Reporte: ranking de productos más vendidos.
+     *
+     * Mismo criterio de exclusión de anuladas; ordena por unidades
+     * vendidas de mayor a menor.
+     */
+    @Query("""
+            select new pe.edu.upeu.PharmaBackend.dto.reporte.ProductoMasVendidoDTO(
+                       p.id,
+                       p.nombre,
+                       cat.nombre,
+                       sum(d.cantidad),
+                       sum(d.subtotal))
+            from DetalleVenta d
+            join d.venta v
+            join d.producto p
+            join p.categoria cat
+            where v.estado = pe.edu.upeu.PharmaBackend.enums.EstadoVenta.REGISTRADA
+              and (:desde is null or v.fecha >= :desde)
+              and (:hasta is null or v.fecha <= :hasta)
+            group by p.id, p.nombre, cat.nombre
+            order by sum(d.cantidad) desc
+            """)
+    List<ProductoMasVendidoDTO> reporteProductosMasVendidos(
+            @Param("desde") LocalDateTime desde,
+            @Param("hasta") LocalDateTime hasta);
 }
