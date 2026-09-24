@@ -2,17 +2,22 @@ package pe.edu.upeu.PharmaBackend.service.impl;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.upeu.PharmaBackend.dto.ClienteRequestDTO;
 import pe.edu.upeu.PharmaBackend.dto.ClienteResponseDTO;
+import pe.edu.upeu.PharmaBackend.dto.PaginaResponseDTO;
 import pe.edu.upeu.PharmaBackend.entity.Cliente;
 import pe.edu.upeu.PharmaBackend.exception.RecursoNoEncontradoException;
 import pe.edu.upeu.PharmaBackend.exception.ReglaNegocioException;
+import pe.edu.upeu.PharmaBackend.mapper.ClienteMapper;
 import pe.edu.upeu.PharmaBackend.repository.ClienteRepository;
 import pe.edu.upeu.PharmaBackend.service.service.ClienteService;
+import pe.edu.upeu.PharmaBackend.util.PaginacionUtil;
 
-import java.util.List;
+import java.util.Set;
 
 @Service
 public class ClienteServiceImpl
@@ -21,16 +26,24 @@ public class ClienteServiceImpl
     private static final Logger log =
             LoggerFactory.getLogger(ClienteServiceImpl.class);
 
+    private static final Set<String> CAMPOS_ORDENABLES =
+            Set.of("id", "dni", "nombres", "apellidos", "email");
+
+    private static final String ORDEN_POR_DEFECTO = "id";
+
     private final ClienteRepository clienteRepository;
+    private final ClienteMapper clienteMapper;
 
     public ClienteServiceImpl(
-            ClienteRepository clienteRepository) {
+            ClienteRepository clienteRepository,
+            ClienteMapper clienteMapper) {
         this.clienteRepository = clienteRepository;
+        this.clienteMapper = clienteMapper;
     }
 
     @Override
     @Transactional
-    public ClienteResponseDTO create(
+    public ClienteResponseDTO crear(
             ClienteRequestDTO request) {
 
         log.info(
@@ -83,12 +96,12 @@ public class ClienteServiceImpl
                 guardado.getId()
         );
 
-        return convertirResponse(guardado);
+        return clienteMapper.toResponse(guardado);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public ClienteResponseDTO read(Long id) {
+    public ClienteResponseDTO buscar(Long id) {
 
         log.info("Buscando cliente id={}", id);
 
@@ -100,24 +113,41 @@ public class ClienteServiceImpl
                                 )
                         );
 
-        return convertirResponse(cliente);
+        return clienteMapper.toResponse(cliente);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ClienteResponseDTO> readAll() {
+    public PaginaResponseDTO<ClienteResponseDTO> listar(
+            int pagina,
+            int tamanio,
+            String ordenarPor,
+            String direccion) {
 
-        log.info("Listando clientes");
+        long inicio = System.currentTimeMillis();
+        log.info("Inicio listar clientes | pagina={} | tamanio={} | "
+                        + "ordenarPor={} | direccion={}",
+                pagina, tamanio, ordenarPor, direccion);
 
-        return clienteRepository.findAll()
-                .stream()
-                .map(this::convertirResponse)
-                .toList();
+        Pageable pageable = PaginacionUtil.construir(
+                pagina, tamanio, ordenarPor, direccion,
+                CAMPOS_ORDENABLES, ORDEN_POR_DEFECTO);
+
+        Page<ClienteResponseDTO> resultado =
+                clienteRepository.findAll(pageable)
+                        .map(clienteMapper::toResponse);
+
+        log.info("Fin listar clientes | filas={} | total={} | duracionMs={}",
+                resultado.getNumberOfElements(),
+                resultado.getTotalElements(),
+                System.currentTimeMillis() - inicio);
+
+        return PaginaResponseDTO.de(resultado);
     }
 
     @Override
     @Transactional
-    public ClienteResponseDTO update(
+    public ClienteResponseDTO actualizar(
             Long id,
             ClienteRequestDTO request) {
 
@@ -180,12 +210,12 @@ public class ClienteServiceImpl
                 id
         );
 
-        return convertirResponse(actualizado);
+        return clienteMapper.toResponse(actualizado);
     }
 
     @Override
     @Transactional
-    public void delete(Long id) {
+    public void eliminar(Long id) {
 
         Cliente cliente =
                 clienteRepository.findById(id)
@@ -195,28 +225,19 @@ public class ClienteServiceImpl
                                 )
                         );
 
-        clienteRepository.delete(cliente);
+        // Baja lógica: el cliente queda referenciado desde ventas.cliente_id.
+        if (!Boolean.TRUE.equals(cliente.getEstado())) {
+            throw new ReglaNegocioException(
+                    "El cliente con id " + id + " ya se encuentra inactivo"
+            );
+        }
+
+        cliente.setEstado(false);
+        clienteRepository.save(cliente);
 
         log.info(
-                "Cliente id={} eliminado correctamente",
+                "Cliente id={} dado de baja correctamente",
                 id
-        );
-    }
-
-    private ClienteResponseDTO convertirResponse(
-            Cliente cliente) {
-
-        return new ClienteResponseDTO(
-                cliente.getId(),
-                cliente.getDni(),
-                cliente.getNombres(),
-                cliente.getApellidos(),
-                cliente.getEmail(),
-                cliente.getTelefono(),
-                cliente.getDireccion(),
-                cliente.getEstado(),
-                cliente.getFechaCreacion(),
-                cliente.getFechaModificacion()
         );
     }
 

@@ -8,14 +8,43 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.OracleDialect
     hibernate:
-      ddl-auto: update
+      # El esquema lo crea Flyway (db/migration); Hibernate solo valida
+      # que las entidades coincidan con lo que hay en la base.
+      ddl-auto: validate
     show-sql: true
 
     properties:
       hibernate:
         format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Un esquema de desarrollo creado antes por ddl-auto=update ya tiene
+    # las tablas: se registra como version 1 y V1 no se vuelve a ejecutar.
+    # En un esquema vacio se aplica V1 normalmente.
+    baseline-on-migrate: true
+    baseline-version: 1
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
   api-docs:
     enabled: true
+
+# Trazabilidad en desarrollo: se quiere ver el detalle de las
+# consultas y de los parametros que llegan a cada servicio.
+logging:
+  level:
+    root: INFO
+    pe.edu.upeu.PharmaBackend: DEBUG
+    pe.edu.upeu.PharmaBackend.service.impl: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.springframework.web: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
+
+# Origenes del frontend autorizados a consumir /api/** en desarrollo.
+# Se declaran uno por uno: nunca el comodin "*".
+app:
+  cors:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173,http://localhost:4200
