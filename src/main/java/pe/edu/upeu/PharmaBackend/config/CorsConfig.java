@@ -5,14 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/*
- * Configuración global de CORS para el frontend de la Unidad 2.
- *
- * Los orígenes se declaran de forma explícita: no se usa el comodín
- * "*", porque deshabilita el envío de credenciales y abre la API a
- * cualquier sitio. La lista se puede sobrescribir por perfil con la
- * propiedad app.cors.allowed-origins.
- */
+
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
 

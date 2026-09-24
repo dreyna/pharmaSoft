@@ -11,6 +11,7 @@ import pe.edu.upeu.PharmaBackend.dto.CategoriaResponseDTO;
 import pe.edu.upeu.PharmaBackend.entity.Categoria;
 import pe.edu.upeu.PharmaBackend.exception.RecursoNoEncontradoException;
 import pe.edu.upeu.PharmaBackend.exception.ReglaNegocioException;
+import pe.edu.upeu.PharmaBackend.mapper.CategoriaMapper;
 import pe.edu.upeu.PharmaBackend.repository.CategoriaRepository;
 import pe.edu.upeu.PharmaBackend.repository.ProductoRepository;
 import pe.edu.upeu.PharmaBackend.service.service.CategoriaService;
@@ -21,21 +22,23 @@ public class CategoriaServiceImpl implements CategoriaService {
 
     private static final Logger log =
             LoggerFactory.getLogger(CategoriaServiceImpl.class);
-    private static final Logger LOG = LoggerFactory.getLogger(CategoriaServiceImpl.class);
 
     private final CategoriaRepository categoriaRepository;
     private final ProductoRepository productoRepository;
+    private final CategoriaMapper categoriaMapper;
 
     public CategoriaServiceImpl(CategoriaRepository categoriaRepository,
-                                ProductoRepository productoRepository) {
+                                ProductoRepository productoRepository,
+                                CategoriaMapper categoriaMapper) {
         this.categoriaRepository = categoriaRepository;
         this.productoRepository = productoRepository;
+        this.categoriaMapper = categoriaMapper;
     }
 
     @Override
     @Transactional
-    public CategoriaResponseDTO create(CategoriaRequestDTO t) {
-        String nombre = t.getNombre().trim();//"Carnes " != "Carnes"
+    public CategoriaResponseDTO crear(CategoriaRequestDTO request) {
+        String nombre = request.getNombre().trim();//"Carnes " != "Carnes"
         if(categoriaRepository.existsByNombreIgnoreCase(nombre)){
             throw new ReglaNegocioException(
                     "Ya existe una categoria con el nomre "+ nombre
@@ -44,64 +47,64 @@ public class CategoriaServiceImpl implements CategoriaService {
 
         Categoria categoria = new Categoria();
         categoria.setNombre(nombre);
-        categoria.setDescripcion(t.getDescripcion());
-        categoria.setEstado(t.getEstado());
+        categoria.setDescripcion(request.getDescripcion());
+        categoria.setEstado(request.getEstado());
 
         Categoria catCreada = categoriaRepository.save(categoria);
 
-        return convertirResponse(catCreada);
+        return categoriaMapper.toResponse(catCreada);
     }
 
     @Override
     @Transactional
-    public CategoriaResponseDTO update(Long aLong, CategoriaRequestDTO t) {
-        Categoria categoria = categoriaRepository.findById(aLong).orElseThrow(()->
+    public CategoriaResponseDTO actualizar(Long id, CategoriaRequestDTO request) {
+        Categoria categoria = categoriaRepository.findById(id).orElseThrow(()->
                 new RecursoNoEncontradoException(
-                        "Categoria no encontrada con id: "+ aLong
+                        "Categoria no encontrada con id: "+ id
                 )
         );
 
-        String nombre = t.getNombre().trim();
-        if(categoriaRepository.existsByNombreIgnoreCaseAndIdNot(nombre, aLong)){
+        String nombre = request.getNombre().trim();
+        if(categoriaRepository.existsByNombreIgnoreCaseAndIdNot(nombre, id)){
             throw new ReglaNegocioException(
                     "Ya existe una categoria con el nomre "+ nombre
             );
         }
 
         categoria.setNombre(nombre);
-        categoria.setDescripcion(t.getDescripcion());
-        categoria.setEstado(t.getEstado());
+        categoria.setDescripcion(request.getDescripcion());
+        categoria.setEstado(request.getEstado());
 
         Categoria catActualizada = categoriaRepository.saveAndFlush(categoria);
 
-        return convertirResponse(catActualizada);
+        return categoriaMapper.toResponse(catActualizada);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public CategoriaResponseDTO read(Long aLong) {
+    public CategoriaResponseDTO buscar(Long id) {
 
-        log.info("Buscando categoria | id={}", aLong);
+        log.info("Buscando categoria | id={}", id);
 
-        Categoria categoria =  categoriaRepository.findById(aLong)
+        Categoria categoria =  categoriaRepository.findById(id)
                 .orElseThrow(()->
                         new RecursoNoEncontradoException(
-                                "Categoria no encontrada con id: "+ aLong
+                                "Categoria no encontrada con id: "+ id
                         )
                 );
-        return convertirResponse(categoria);
+        return categoriaMapper.toResponse(categoria);
     }
 
     @Override
     @Transactional
-    public void delete(Long aLong) {
-        Categoria categoria = categoriaRepository.findById(aLong).orElseThrow(()->
+    public void eliminar(Long id) {
+        Categoria categoria = categoriaRepository.findById(id).orElseThrow(()->
                 new RecursoNoEncontradoException(
-                        "Categoria no encontrada con id: "+ aLong
+                        "Categoria no encontrada con id: "+ id
                 )
         );
 
-        if(productoRepository.existsByCategoriaId(aLong)){
+        if(productoRepository.existsByCategoriaId(id)){
             throw new ReglaNegocioException(
                     "No se puede eliminar la categoria "+ categoria.getNombre()
                             + " porque tiene productos asociados"
@@ -113,7 +116,7 @@ public class CategoriaServiceImpl implements CategoriaService {
 
     @Override
     @Transactional(readOnly = true)
-    public Iterable<CategoriaResponseDTO> readAll() {
+    public List<CategoriaResponseDTO> listar() {
 
         long inicio = System.currentTimeMillis();
         log.info("Inicio listar categorias");
@@ -121,7 +124,7 @@ public class CategoriaServiceImpl implements CategoriaService {
         List<CategoriaResponseDTO> resultado =
                 categoriaRepository.findAll()
                         .stream()
-                        .map(this::convertirResponse)
+                        .map(categoriaMapper::toResponse)
                         .toList();
 
         log.info("Fin listar categorias | filas={} | duracionMs={}",
@@ -129,16 +132,5 @@ public class CategoriaServiceImpl implements CategoriaService {
                 System.currentTimeMillis() - inicio);
 
         return resultado;
-    }
-
-    private CategoriaResponseDTO convertirResponse(Categoria categoria){
-        return new CategoriaResponseDTO(
-              categoria.getId(),
-              categoria.getNombre(),
-              categoria.getDescripcion(),
-              categoria.getEstado(),
-              categoria.getFechaCreacion(),
-              categoria.getFechaModificacion()
-        );
     }
 }

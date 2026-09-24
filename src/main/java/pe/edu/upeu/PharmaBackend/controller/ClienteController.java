@@ -6,9 +6,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pe.edu.upeu.PharmaBackend.dto.ClienteRequestDTO;
 import pe.edu.upeu.PharmaBackend.dto.ClienteResponseDTO;
+import pe.edu.upeu.PharmaBackend.dto.PaginaResponseDTO;
 import pe.edu.upeu.PharmaBackend.service.service.ClienteService;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/clientes")
@@ -23,48 +22,64 @@ public class ClienteController {
     }
 
     @PostMapping
-    public ResponseEntity<ClienteResponseDTO> create(
+    public ResponseEntity<ClienteResponseDTO> crear(
             @Valid
             @RequestBody ClienteRequestDTO request) {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(clienteService.create(request));
+                .body(clienteService.crear(request));
     }
 
+    /*
+     * Listado paginado de clientes.
+     * Campos de ordenamiento permitidos: id, dni, nombres, apellidos, email.
+     */
     @GetMapping
-    public ResponseEntity<Iterable<ClienteResponseDTO>> readAll() {
+    public ResponseEntity<PaginaResponseDTO<ClienteResponseDTO>> listar(
+
+            @RequestParam(defaultValue = "0")
+            int pagina,
+
+            @RequestParam(defaultValue = "20")
+            int tamanio,
+
+            @RequestParam(required = false, defaultValue = "id")
+            String ordenarPor,
+
+            @RequestParam(required = false, defaultValue = "asc")
+            String direccion) {
 
         return ResponseEntity.ok(
-                clienteService.readAll()
+                clienteService.listar(pagina, tamanio, ordenarPor, direccion)
         );
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ClienteResponseDTO> read(
+    public ResponseEntity<ClienteResponseDTO> buscar(
             @PathVariable Long id) {
 
         return ResponseEntity.ok(
-                clienteService.read(id)
+                clienteService.buscar(id)
         );
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ClienteResponseDTO> update(
+    public ResponseEntity<ClienteResponseDTO> actualizar(
             @PathVariable Long id,
             @Valid
             @RequestBody ClienteRequestDTO request) {
 
         return ResponseEntity.ok(
-                clienteService.update(id, request)
+                clienteService.actualizar(id, request)
         );
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(
+    public ResponseEntity<Void> eliminar(
             @PathVariable Long id) {
 
-        clienteService.delete(id);
+        clienteService.eliminar(id);
 
         return ResponseEntity
                 .noContent()

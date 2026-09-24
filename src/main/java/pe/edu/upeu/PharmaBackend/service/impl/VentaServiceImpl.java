@@ -2,11 +2,12 @@ package pe.edu.upeu.PharmaBackend.service.impl;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.upeu.PharmaBackend.dto.DetalleVentaRequestDTO;
-import pe.edu.upeu.PharmaBackend.dto.DetalleVentaResponseDTO;
+import pe.edu.upeu.PharmaBackend.dto.PaginaResponseDTO;
 import pe.edu.upeu.PharmaBackend.dto.VentaRequestDTO;
 import pe.edu.upeu.PharmaBackend.dto.VentaResponseDTO;
 import pe.edu.upeu.PharmaBackend.entity.Cliente;
@@ -16,16 +17,17 @@ import pe.edu.upeu.PharmaBackend.entity.Venta;
 import pe.edu.upeu.PharmaBackend.enums.EstadoVenta;
 import pe.edu.upeu.PharmaBackend.exception.RecursoNoEncontradoException;
 import pe.edu.upeu.PharmaBackend.exception.ReglaNegocioException;
+import pe.edu.upeu.PharmaBackend.mapper.VentaMapper;
 import pe.edu.upeu.PharmaBackend.repository.ClienteRepository;
 import pe.edu.upeu.PharmaBackend.repository.ProductoRepository;
 import pe.edu.upeu.PharmaBackend.repository.VentaRepository;
 import pe.edu.upeu.PharmaBackend.service.service.VentaService;
+import pe.edu.upeu.PharmaBackend.util.PaginacionUtil;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
 import java.util.Set;
 @Service
 public class VentaServiceImpl implements VentaService {
@@ -47,15 +49,18 @@ public class VentaServiceImpl implements VentaService {
     private final VentaRepository ventaRepository;
     private final ClienteRepository clienteRepository;
     private final ProductoRepository productoRepository;
+    private final VentaMapper ventaMapper;
 
     public VentaServiceImpl(
             VentaRepository ventaRepository,
             ClienteRepository clienteRepository,
-            ProductoRepository productoRepository) {
+            ProductoRepository productoRepository,
+            VentaMapper ventaMapper) {
 
         this.ventaRepository = ventaRepository;
         this.clienteRepository = clienteRepository;
         this.productoRepository = productoRepository;
+        this.ventaMapper = ventaMapper;
     }
 
     @Override
@@ -92,7 +97,18 @@ public class VentaServiceImpl implements VentaService {
                 throw new ReglaNegocioException("El producto "+ producto.getNombre()+ " se encuentra inactivo");
             }
 
-            if (producto.getStock()< item.getCantidad()) {
+            /*
+             * El descuento es un UPDATE condicional en la base (ver
+             * ProductoRepository.descontarStock): si devuelve 0 es que
+             * otra venta se llevó el stock entre la lectura y este
+             * punto, o simplemente no alcanzaba. La excepción revierte
+             * toda la transacción, incluidos los descuentos de los
+             * ítems anteriores.
+             */
+            int filas = productoRepository.descontarStock(
+                    producto.getId(), item.getCantidad());
+
+            if (filas == 0) {
 
                 throw new ReglaNegocioException("Stock insuficiente para "+ producto.getNombre()+ ". Disponible: "+ producto.getStock()
                                 + ", solicitado: "+ item.getCantidad());
@@ -110,8 +126,6 @@ public class VentaServiceImpl implements VentaService {
             venta.agregarDetalle(detalle);
 
             total = total.add(subtotal);
-
-            producto.setStock(producto.getStock()- item.getCantidad());
         }
 
         venta.setTotal(total);
@@ -125,7 +139,7 @@ public class VentaServiceImpl implements VentaService {
                 guardada.getDetalles().size(),
                 System.currentTimeMillis() - inicio);
 
-        return convertirResponse(guardada);
+        return ventaMapper.toResponse(guardada);
     }
 
     @Override
@@ -141,44 +155,40 @@ public class VentaServiceImpl implements VentaService {
         log.info("Fin buscar venta por id | id={} | filas={} | duracionMs={}",
                 id, 1, System.currentTimeMillis() - inicio);
 
-        return convertirResponse(venta);
+        return ventaMapper.toResponse(venta);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<VentaResponseDTO> listar() {
+    public PaginaResponseDTO<VentaResponseDTO> listar(
+            int pagina,
+            int tamanio,
+            String ordenarPor,
+            String direccion) {
 
-        long inicio = System.currentTimeMillis();
-        log.info("Inicio listar ventas");
-
-        List<VentaResponseDTO> resultado =
-                ventaRepository.findAll()
-                        .stream()
-                        .map(this::convertirResponse)
-                        .toList();
-
-        log.info("Fin listar ventas | filas={} | duracionMs={}",
-                resultado.size(),
-                System.currentTimeMillis() - inicio);
-
-        return resultado;
+        return buscar(null, null, null, null,
+                pagina, tamanio, ordenarPor, direccion);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<VentaResponseDTO> buscar(
+    public PaginaResponseDTO<VentaResponseDTO> buscar(
             Long clienteId,
             EstadoVenta estado,
             LocalDate desde,
             LocalDate hasta,
+            int pagina,
+            int tamanio,
             String ordenarPor,
             String direccion) {
 
         long inicio = System.currentTimeMillis();
 
         log.info("Inicio buscar ventas | clienteId={} | estado={} | "
-                        + "desde={} | hasta={} | ordenarPor={} | direccion={}",
-                clienteId, estado, desde, hasta, ordenarPor, direccion);
+                        + "desde={} | hasta={} | pagina={} | tamanio={} | "
+                        + "ordenarPor={} | direccion={}",
+                clienteId, estado, desde, hasta,
+                pagina, tamanio, ordenarPor, direccion);
 
         if (desde != null
                 && hasta != null
@@ -191,7 +201,9 @@ public class VentaServiceImpl implements VentaService {
                             + hasta + ")");
         }
 
-        Sort sort = construirSort(ordenarPor, direccion);
+        Pageable pageable = PaginacionUtil.construir(
+                pagina, tamanio, ordenarPor, direccion,
+                CAMPOS_ORDENABLES, ORDEN_POR_DEFECTO);
 
         LocalDateTime desdeHora = (desde == null)
                 ? null
@@ -201,85 +213,26 @@ public class VentaServiceImpl implements VentaService {
                 ? null
                 : hasta.atTime(LocalTime.MAX);
 
-        List<VentaResponseDTO> resultado =
-                ventaRepository
-                        .buscar(clienteId, estado, desdeHora, hastaHora, sort)
-                        .stream()
-                        .map(this::convertirResponse)
-                        .toList();
+        Page<Venta> ventas = ventaRepository
+                .buscar(clienteId, estado, desdeHora, hastaHora, pageable);
+
+        // Segunda consulta: detalles y productos de toda la página de
+        // una vez, en lugar de una consulta por venta al convertir.
+        if (ventas.hasContent()) {
+            ventaRepository.cargarDetalles(ventas.getContent());
+        }
+
+        Page<VentaResponseDTO> resultado =
+                ventas.map(ventaMapper::toResponse);
 
         log.info("Fin buscar ventas | clienteId={} | estado={} | "
                         + "desde={} | hasta={} | orden={} {} | "
-                        + "filas={} | duracionMs={}",
+                        + "filas={} | total={} | duracionMs={}",
                 clienteId, estado, desde, hasta, ordenarPor, direccion,
-                resultado.size(),
+                resultado.getNumberOfElements(),
+                resultado.getTotalElements(),
                 System.currentTimeMillis() - inicio);
 
-        return resultado;
-    }
-
-    /*
-     * Valida el campo de ordenamiento contra la lista blanca y arma
-     * el Sort que se entrega al repositorio.
-     */
-    private Sort construirSort(String ordenarPor, String direccion) {
-
-        String campo = (ordenarPor == null || ordenarPor.isBlank())
-                ? ORDEN_POR_DEFECTO
-                : ordenarPor.trim();
-
-        if (!CAMPOS_ORDENABLES.contains(campo)) {
-
-            throw new ReglaNegocioException(
-                    "El campo de ordenamiento '"
-                            + campo
-                            + "' no está permitido. Campos válidos: "
-                            + CAMPOS_ORDENABLES);
-        }
-
-        String sentido = (direccion == null || direccion.isBlank())
-                ? "desc"
-                : direccion.trim();
-
-        if (!sentido.equalsIgnoreCase("asc")
-                && !sentido.equalsIgnoreCase("desc")) {
-
-            throw new ReglaNegocioException(
-                    "La dirección de ordenamiento '"
-                            + sentido
-                            + "' no está permitida. Valores válidos: asc, desc");
-        }
-
-        return sentido.equalsIgnoreCase("asc")
-                ? Sort.by(campo).ascending()
-                : Sort.by(campo).descending();
-    }
-
-    private VentaResponseDTO convertirResponse(Venta venta) {
-
-        List<DetalleVentaResponseDTO> detalles =
-                venta.getDetalles()
-                        .stream()
-                        .map(detalle ->
-                                new DetalleVentaResponseDTO(
-                                        detalle.getProducto().getId(),
-                                        detalle.getProducto().getNombre(),
-                                        detalle.getCantidad(),
-                                        detalle.getPrecio(),
-                                        detalle.getSubtotal()
-                                )
-                        ).toList();
-
-        String clienteNombre = venta.getCliente().getNombres()+ " "+ venta.getCliente().getApellidos();
-
-        return new VentaResponseDTO(
-                venta.getId(),
-                venta.getFecha(),
-                venta.getCliente().getId(),
-                clienteNombre,
-                venta.getEstado().name(),
-                venta.getTotal(),
-                detalles
-        );
+        return PaginaResponseDTO.de(resultado);
     }
 }
